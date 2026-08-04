@@ -51,7 +51,7 @@ npm run electron:dev
 npm run dist:win
 ```
 
-Outputs under `dist-electron/`:
+Outputs under `../vibe-build-out/` (next to the project folder):
 
 - `Vibe-Setup-1.0.0.exe` — NSIS installer  
 - `Vibe-Portable-1.0.0.exe` — portable  
