@@ -124,27 +124,6 @@
   background: linear-gradient(110deg, #25f4ee, #fe2c55);
 }
 
-.demo-hint {
-  margin-top: 1.1rem;
-  text-align: center;
-  color: rgba(255, 255, 255, 0.45);
-  font-size: 0.8rem;
-}
-
-.demo-hint p {
-  margin: 0 0 0.3rem;
-}
-
-.demo-hint code {
-  display: inline-block;
-  background: #0d0d10;
-  padding: 0.35rem 0.65rem;
-  border-radius: 8px;
-  color: #25f4ee;
-  font-size: 0.78rem;
-  margin: 0.15rem;
-}
-
 .auth-back {
   margin: 1rem 0 0;
   text-align: center;

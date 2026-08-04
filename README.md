@@ -8,13 +8,7 @@ Multi-user data lives in a local **Express API** (JSON DB + media files). The Wi
 
 Grab the latest **Vibe Setup** installer from [Releases](https://github.com/forevershy/vibe-social/releases).
 
-Demo logins after install:
-
-| Username | Password |
-|----------|----------|
-| `shy` | `owner123` (owner) |
-| `maya.moves` | `demo123` |
-| `jordan.eats` | `demo123` |
+After install, **create an account** in the app (Sign up) or log in with your own credentials.
 
 ## Run from source
 

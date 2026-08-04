@@ -93,7 +93,7 @@ export function AuthPage() {
               <input
                 value={form.username}
                 onChange={(e) => setForm({ ...form, username: e.target.value })}
-                placeholder="maya.moves or shy"
+                placeholder="username"
                 required
               />
             </label>
@@ -115,13 +115,6 @@ export function AuthPage() {
             {mode === 'login' ? 'Log in' : 'Create account'}
           </button>
         </form>
-
-        <div className="demo-hint">
-          <p>Try a demo account</p>
-          <code>maya.moves / demo123</code>
-          <p style={{ marginTop: '0.65rem' }}>Owner panel</p>
-          <code>shy / owner123</code>
-        </div>
 
         <p className="auth-back">
           <Link to={next.startsWith('/') ? next : '/'}>Continue browsing</Link>
