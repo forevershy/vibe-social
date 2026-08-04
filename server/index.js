@@ -87,7 +87,7 @@ function pushActivity(toUserId, fromUserId, type, postId, text) {
 
 const app = express()
 app.use(cors())
-app.use(express.json({ limit: '2mb' }))
+app.use(express.json({ limit: '8mb' }))
 app.use(auth)
 app.use('/media', express.static(MEDIA_DIR))
 

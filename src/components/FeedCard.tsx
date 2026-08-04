@@ -41,28 +41,29 @@ async function tryPlay(
   el.playsInline = true
   el.setAttribute('playsinline', '')
   el.setAttribute('webkit-playsinline', '')
-  // Prefer muted first so autoplay policies always allow playback
+
   const attempt = async (withMute: boolean) => {
     el.muted = withMute
     el.defaultMuted = withMute
     if (withMute) el.setAttribute('muted', '')
     else el.removeAttribute('muted')
-    await el.play()
+    const p = el.play()
+    if (p !== undefined) await p
     return withMute
   }
 
+  // Always unlock with muted autoplay first (browser policy), then unmute if allowed
   try {
-    if (preferMuted) {
-      await attempt(true)
-      return { ok: true, muted: true }
+    await attempt(true)
+    if (!preferMuted) {
+      try {
+        await attempt(false)
+        return { ok: true, muted: false }
+      } catch {
+        return { ok: true, muted: true }
+      }
     }
-    try {
-      await attempt(false)
-      return { ok: true, muted: false }
-    } catch {
-      await attempt(true)
-      return { ok: true, muted: true }
-    }
+    return { ok: true, muted: true }
   } catch {
     try {
       el.load()
@@ -217,18 +218,23 @@ export function FeedCard({ post, active, muted, onToggleMute, onAutoplayBlocked 
 
     const playActive = async () => {
       if (cancelled || !active) return
-      const result = await tryPlay(el, muted)
-      if (cancelled) return
-      if (result.ok) {
-        if (result.muted && !muted) onAutoplayBlocked?.()
-        else {
-          el.muted = muted
-          el.defaultMuted = muted
+      // Retry a few times — first paint / scroll snap can race load
+      for (let i = 0; i < 4; i++) {
+        if (cancelled || !active) return
+        const result = await tryPlay(el, muted)
+        if (cancelled) return
+        if (result.ok) {
+          if (result.muted && !muted) onAutoplayBlocked?.()
+          else {
+            el.muted = muted
+            el.defaultMuted = muted
+          }
+          setShowPlayBtn(false)
+          return
         }
-        setShowPlayBtn(false)
-      } else {
-        setShowPlayBtn(true)
+        await new Promise((r) => window.setTimeout(r, 120 * (i + 1)))
       }
+      setShowPlayBtn(true)
     }
 
     const onError = () => {

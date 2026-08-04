@@ -112,7 +112,7 @@ export function ProfileVideoPage() {
   const author = post ? getUser(post.userId) : undefined
 
   const [sideTab, setSideTab] = useState<SideTab>('comments')
-  const [muted, setMuted] = useState(false)
+  const [muted, setMuted] = useState(true)
   const [captionOpen, setCaptionOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -183,24 +183,24 @@ export function ProfileVideoPage() {
     el.playsInline = true
 
     const play = async () => {
-      el.muted = muted
-      el.defaultMuted = muted
-      if (muted) el.setAttribute('muted', '')
-      else el.removeAttribute('muted')
+      // Muted unlock first so autoplay always works
+      el.muted = true
+      el.defaultMuted = true
+      el.setAttribute('muted', '')
       try {
         await el.play()
-      } catch {
         if (!muted) {
-          el.muted = true
-          el.defaultMuted = true
-          el.setAttribute('muted', '')
+          el.muted = false
+          el.defaultMuted = false
+          el.removeAttribute('muted')
           try {
             await el.play()
-            if (!cancelled) setMuted(true)
           } catch {
-            /* ignore */
+            if (!cancelled) setMuted(true)
           }
         }
+      } catch {
+        /* ignore */
       }
     }
 

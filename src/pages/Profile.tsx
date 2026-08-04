@@ -128,9 +128,9 @@ export function ProfilePage({ self = false }: { self?: boolean }) {
     setMsg('')
   }
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
     const bio = draft.bio.slice(0, BIO_MAX)
-    const res = updateProfile({
+    const res = await updateProfile({
       displayName: draft.displayName,
       bio,
       username: draft.username,
@@ -169,7 +169,7 @@ export function ProfilePage({ self = false }: { self?: boolean }) {
     try {
       const url = await fileToDataUrl(file)
       if (mode === 'save') {
-        const res = updateProfile({ avatar: url })
+        const res = await updateProfile({ avatar: url })
         if (!res.ok) {
           setMsg(res.error || 'Could not update photo')
           if (!editing) startEdit()
@@ -535,7 +535,7 @@ export function ProfilePage({ self = false }: { self?: boolean }) {
               <button
                 type="button"
                 className="edit-save"
-                onClick={saveEdit}
+                onClick={() => void saveEdit()}
                 disabled={avatarBusy}
               >
                 Save

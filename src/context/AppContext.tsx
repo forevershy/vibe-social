@@ -43,7 +43,9 @@ interface AppContextValue {
   }) => Promise<AuthResult>
   login: (usernameOrEmail: string, password: string) => Promise<AuthResult>
   logout: () => void
-  updateProfile: (patch: Partial<Pick<User, 'displayName' | 'bio' | 'avatar' | 'username'>>) => AuthResult
+  updateProfile: (
+    patch: Partial<Pick<User, 'displayName' | 'bio' | 'avatar' | 'username'>>,
+  ) => Promise<AuthResult>
   follow: (userId: string) => void
   unfollow: (userId: string) => void
   createPost: (input: {
@@ -151,7 +153,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setPosts(boot.posts)
           setConversations(boot.conversations || [])
           setActivities(boot.activities || [])
-          setCurrentUserId(boot.me?.id || null)
+          // Restore session from JWT; fall back to last local user id if still valid
+          const local = loadState()
+          const meId =
+            boot.me?.id ||
+            (local.currentUserId && boot.users.some((u) => u.id === local.currentUserId)
+              ? local.currentUserId
+              : null)
+          setCurrentUserId(meId)
           setReady(true)
           return
         } catch {
@@ -163,9 +172,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setPosts(s.posts)
       setConversations(s.conversations || [])
       setActivities(s.activities || [])
-      const shy = s.users.find((u) => u.id === 'u_shy' || u.username === 'shy')
-      // Prefer guest browse when API offline — still auto-login shy for demo
-      setCurrentUserId(s.currentUserId || shy?.id || null)
+      setCurrentUserId(s.currentUserId || null)
       setApiOnline(false)
       setReady(true)
     })()
@@ -175,9 +182,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
-    if (!ready || apiOnline) return
+    if (!ready) return
+    // Always mirror to localStorage so profile/session survive app restarts
+    // even if the API is down next launch.
     saveState({ users, posts, conversations, activities, currentUserId })
-  }, [users, posts, conversations, activities, currentUserId, ready, apiOnline])
+  }, [users, posts, conversations, activities, currentUserId, ready])
 
   const showToast = useCallback((msg: string) => {
     setToast(msg)
@@ -305,27 +314,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [showToast])
 
   const updateProfile = useCallback(
-    (patch: Partial<Pick<User, 'displayName' | 'bio' | 'avatar' | 'username'>>): AuthResult => {
+    async (
+      patch: Partial<Pick<User, 'displayName' | 'bio' | 'avatar' | 'username'>>,
+    ): Promise<AuthResult> => {
       if (!currentUserId) return { ok: false, error: 'Not logged in' }
       const me = users.find((u) => u.id === currentUserId)
       if (!me) return { ok: false, error: 'Not logged in' }
 
-      if (patch.username) {
-        const username = patch.username.trim().toLowerCase().replace(/[^a-z0-9._]/g, '')
+      const nextPatch = { ...patch }
+
+      if (nextPatch.username) {
+        const username = nextPatch.username.trim().toLowerCase().replace(/[^a-z0-9._]/g, '')
         if (username.length < 3) return { ok: false, error: 'Username too short' }
         if (users.some((u) => u.username === username && u.id !== currentUserId)) {
           return { ok: false, error: 'Username already taken' }
         }
-        patch.username = username
+        nextPatch.username = username
       }
 
-      if (patch.bio !== undefined) {
-        patch.bio = patch.bio.slice(0, 80)
+      if (nextPatch.bio !== undefined) {
+        nextPatch.bio = nextPatch.bio.slice(0, 160)
       }
 
-      if (patch.displayName !== undefined) {
-        const nextName = patch.displayName.trim() || me.username
-        patch.displayName = nextName
+      if (nextPatch.displayName !== undefined) {
+        const nextName = nextPatch.displayName.trim() || me.username
+        nextPatch.displayName = nextName
         if (nextName !== me.displayName) {
           const cooldown = 7 * 24 * 60 * 60 * 1000
           if (me.nameChangedAt && Date.now() - me.nameChangedAt < cooldown) {
@@ -334,23 +347,73 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      if (apiOnline) {
+        try {
+          const res = await api.updateMe(nextPatch)
+          setUsers((prev) =>
+            prev.map((u) => {
+              if (u.id !== currentUserId) return u
+              const next = { ...u, ...res.user }
+              if (
+                nextPatch.displayName !== undefined &&
+                nextPatch.displayName !== me.displayName
+              ) {
+                next.nameChangedAt = Date.now()
+              }
+              return next
+            }),
+          )
+          showToast('Profile saved')
+          return { ok: true }
+        } catch (e) {
+          return { ok: false, error: e instanceof Error ? e.message : 'Could not save profile' }
+        }
+      }
+
       setUsers((prev) =>
         prev.map((u) => {
           if (u.id !== currentUserId) return u
-          const next = { ...u, ...patch }
+          const next = { ...u, ...nextPatch }
           if (
-            patch.displayName !== undefined &&
-            patch.displayName !== u.displayName
+            nextPatch.displayName !== undefined &&
+            nextPatch.displayName !== u.displayName
           ) {
             next.nameChangedAt = Date.now()
           }
           return next
         }),
       )
-      showToast('Profile updated')
+      // Flush immediately so closing the app right after save still keeps data
+      const nextUsers = users.map((u) => {
+        if (u.id !== currentUserId) return u
+        const next = { ...u, ...nextPatch }
+        if (
+          nextPatch.displayName !== undefined &&
+          nextPatch.displayName !== u.displayName
+        ) {
+          next.nameChangedAt = Date.now()
+        }
+        return next
+      })
+      saveState({
+        users: nextUsers,
+        posts,
+        conversations,
+        activities,
+        currentUserId,
+      })
+      showToast('Profile saved')
       return { ok: true }
     },
-    [currentUserId, users, showToast],
+    [
+      currentUserId,
+      users,
+      showToast,
+      apiOnline,
+      posts,
+      conversations,
+      activities,
+    ],
   )
 
   const follow = useCallback(
