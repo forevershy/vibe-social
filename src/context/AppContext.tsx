@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import { loadState, saveState } from '../lib/storage'
-import { api, checkApi, setToken } from '../lib/api'
+import { api, checkApi, setToken, getToken } from '../lib/api'
 import { canViewPost, isOwnerUser, parseTags, uid } from '../lib/utils'
 import type {
   Activity,
@@ -142,24 +142,61 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false
     ;(async () => {
+      const local = loadState()
       const online = await checkApi()
       if (cancelled) return
+
       if (online) {
         try {
           const boot = await api.bootstrap()
           if (cancelled) return
           setApiOnline(true)
-          setUsers(boot.users)
+
+          let nextUsers = boot.users
+          const meId = boot.me?.id || null
+
+          // Re-apply any newer local profile edits the server never got
+          if (meId) {
+            const localMe = local.users.find((u) => u.id === meId)
+            const serverMe = boot.users.find((u) => u.id === meId)
+            if (localMe && serverMe) {
+              const localNewer =
+                (localMe.nameChangedAt || 0) > (serverMe.nameChangedAt || 0) ||
+                localMe.displayName !== serverMe.displayName ||
+                localMe.bio !== serverMe.bio ||
+                localMe.avatar !== serverMe.avatar ||
+                localMe.username !== serverMe.username
+              if (localNewer) {
+                nextUsers = nextUsers.map((u) =>
+                  u.id === meId
+                    ? {
+                        ...u,
+                        displayName: localMe.displayName,
+                        bio: localMe.bio,
+                        avatar: localMe.avatar,
+                        username: localMe.username,
+                        nameChangedAt: localMe.nameChangedAt || u.nameChangedAt,
+                      }
+                    : u,
+                )
+                if (getToken()) {
+                  void api
+                    .updateMe({
+                      displayName: localMe.displayName,
+                      bio: localMe.bio,
+                      avatar: localMe.avatar,
+                      username: localMe.username,
+                    })
+                    .catch(() => undefined)
+                }
+              }
+            }
+          }
+
+          setUsers(nextUsers)
           setPosts(boot.posts)
           setConversations(boot.conversations || [])
           setActivities(boot.activities || [])
-          // Restore session from JWT; fall back to last local user id if still valid
-          const local = loadState()
-          const meId =
-            boot.me?.id ||
-            (local.currentUserId && boot.users.some((u) => u.id === local.currentUserId)
-              ? local.currentUserId
-              : null)
           setCurrentUserId(meId)
           setReady(true)
           return
@@ -167,12 +204,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
           /* fall through to local */
         }
       }
-      const s = loadState()
-      setUsers(s.users)
-      setPosts(s.posts)
-      setConversations(s.conversations || [])
-      setActivities(s.activities || [])
-      setCurrentUserId(s.currentUserId || null)
+
+      setUsers(local.users)
+      setPosts(local.posts)
+      setConversations(local.conversations || [])
+      setActivities(local.activities || [])
+      setCurrentUserId(local.currentUserId || null)
       setApiOnline(false)
       setReady(true)
     })()
@@ -321,10 +358,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const me = users.find((u) => u.id === currentUserId)
       if (!me) return { ok: false, error: 'Not logged in' }
 
-      const nextPatch = { ...patch }
+      const nextPatch: Partial<Pick<User, 'displayName' | 'bio' | 'avatar' | 'username'>> = {
+        ...patch,
+      }
 
-      if (nextPatch.username) {
-        const username = nextPatch.username.trim().toLowerCase().replace(/[^a-z0-9._]/g, '')
+      if (nextPatch.username != null) {
+        const username = String(nextPatch.username)
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9._]/g, '')
         if (username.length < 3) return { ok: false, error: 'Username too short' }
         if (users.some((u) => u.username === username && u.id !== currentUserId)) {
           return { ok: false, error: 'Username already taken' }
@@ -333,68 +375,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
 
       if (nextPatch.bio !== undefined) {
-        nextPatch.bio = nextPatch.bio.slice(0, 160)
+        nextPatch.bio = String(nextPatch.bio).slice(0, 160)
       }
 
       if (nextPatch.displayName !== undefined) {
-        const nextName = nextPatch.displayName.trim() || me.username
-        nextPatch.displayName = nextName
-        if (nextName !== me.displayName) {
-          const cooldown = 7 * 24 * 60 * 60 * 1000
-          if (me.nameChangedAt && Date.now() - me.nameChangedAt < cooldown) {
-            return { ok: false, error: 'Nickname can only be changed once every 7 days' }
-          }
-        }
+        nextPatch.displayName = String(nextPatch.displayName).trim() || me.username
       }
 
-      if (apiOnline) {
-        try {
-          const res = await api.updateMe(nextPatch)
-          setUsers((prev) =>
-            prev.map((u) => {
-              if (u.id !== currentUserId) return u
-              const next = { ...u, ...res.user }
-              if (
-                nextPatch.displayName !== undefined &&
-                nextPatch.displayName !== me.displayName
-              ) {
-                next.nameChangedAt = Date.now()
-              }
-              return next
-            }),
-          )
-          showToast('Profile saved')
-          return { ok: true }
-        } catch (e) {
-          return { ok: false, error: e instanceof Error ? e.message : 'Could not save profile' }
-        }
-      }
+      const nameChanged =
+        nextPatch.displayName !== undefined && nextPatch.displayName !== me.displayName
 
-      setUsers((prev) =>
-        prev.map((u) => {
-          if (u.id !== currentUserId) return u
-          const next = { ...u, ...nextPatch }
-          if (
-            nextPatch.displayName !== undefined &&
-            nextPatch.displayName !== u.displayName
-          ) {
-            next.nameChangedAt = Date.now()
-          }
-          return next
-        }),
-      )
-      // Flush immediately so closing the app right after save still keeps data
       const nextUsers = users.map((u) => {
         if (u.id !== currentUserId) return u
-        const next = { ...u, ...nextPatch }
-        if (
-          nextPatch.displayName !== undefined &&
-          nextPatch.displayName !== u.displayName
-        ) {
-          next.nameChangedAt = Date.now()
+        return {
+          ...u,
+          ...nextPatch,
+          ...(nameChanged ? { nameChangedAt: Date.now() } : {}),
         }
-        return next
       })
+
+      // Always commit locally first so Save + close app keeps the profile
+      setUsers(nextUsers)
       saveState({
         users: nextUsers,
         posts,
@@ -402,18 +403,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
         activities,
         currentUserId,
       })
+
+      // Best-effort sync to API when we have a real session token
+      if (apiOnline && getToken()) {
+        try {
+          const res = await api.updateMe(nextPatch)
+          setUsers((prev) =>
+            prev.map((u) => {
+              if (u.id !== currentUserId) return u
+              return {
+                ...u,
+                displayName: res.user.displayName ?? u.displayName,
+                bio: res.user.bio ?? u.bio,
+                avatar: res.user.avatar ?? u.avatar,
+                username: res.user.username ?? u.username,
+                ...(nameChanged ? { nameChangedAt: Date.now() } : {}),
+              }
+            }),
+          )
+        } catch {
+          // Local save already succeeded — keep going
+        }
+      }
+
       showToast('Profile saved')
       return { ok: true }
     },
-    [
-      currentUserId,
-      users,
-      showToast,
-      apiOnline,
-      posts,
-      conversations,
-      activities,
-    ],
+    [currentUserId, users, showToast, apiOnline, posts, conversations, activities],
   )
 
   const follow = useCallback(

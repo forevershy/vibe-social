@@ -129,19 +129,24 @@ export function ProfilePage({ self = false }: { self?: boolean }) {
   }
 
   const saveEdit = async () => {
+    setMsg('')
     const bio = draft.bio.slice(0, BIO_MAX)
-    const res = await updateProfile({
-      displayName: draft.displayName,
-      bio,
-      username: draft.username,
-      avatar: draft.avatar.trim() || user.avatar,
-    })
-    if (!res.ok) {
-      setMsg(res.error || 'Could not save')
-      return
+    try {
+      const res = await updateProfile({
+        displayName: draft.displayName,
+        bio,
+        username: draft.username,
+        avatar: draft.avatar.trim() || user.avatar,
+      })
+      if (!res.ok) {
+        setMsg(res.error || 'Could not save')
+        return
+      }
+      setEditing(false)
+      if (draft.username !== user.username) nav(`/u/${draft.username}`)
+    } catch {
+      setMsg('Could not save — try again')
     }
-    setEditing(false)
-    if (draft.username !== user.username) nav(`/u/${draft.username}`)
   }
 
   const nameLockedUntil = user.nameChangedAt
