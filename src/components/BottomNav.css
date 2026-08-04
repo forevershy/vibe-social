@@ -1,0 +1,104 @@
+.bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  height: calc(58px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: rgba(8, 8, 10, 0.92);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(14px);
+}
+
+@media (min-width: 1024px) {
+  .bottom-nav {
+    display: none;
+  }
+}
+
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  color: rgba(255, 255, 255, 0.55);
+  text-decoration: none;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition: color 0.15s ease, transform 0.15s ease;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.nav-item.active {
+  color: #fff;
+}
+
+.nav-item.create {
+  color: #fff;
+}
+
+.nav-item.create svg {
+  background: linear-gradient(135deg, #25f4ee, #fe2c55);
+  border-radius: 8px;
+  padding: 4px;
+  box-sizing: content-box;
+}
+
+.nav-item:active {
+  transform: scale(0.94);
+}
+
+.nav-icon-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.nav-badge {
+  position: absolute;
+  top: -6px;
+  right: -10px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #fe2c55;
+  color: #fff;
+  font-size: 0.6rem;
+  font-style: normal;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+}
+
+.more-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: flex-end;
+}
+
+.more-sheet-backdrop > div {
+  width: 100%;
+  animation: sheetUp 0.2s ease;
+}
+
+@keyframes sheetUp {
+  from {
+    transform: translateY(24px);
+    opacity: 0.7;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}

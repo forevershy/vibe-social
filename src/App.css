@@ -1,0 +1,96 @@
+.app-shell {
+  height: 100dvh;
+  max-width: 480px;
+  margin: 0 auto;
+  position: relative;
+  background: #000;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.app-shell.auth {
+  max-width: none;
+}
+
+.app-main {
+  height: 100%;
+  padding-bottom: calc(58px + env(safe-area-inset-bottom, 0px));
+  overflow: hidden;
+}
+
+.app-shell.auth .app-main {
+  padding-bottom: 0;
+}
+
+.app-shell.immersive {
+  max-width: none;
+  margin: 0;
+  height: 100dvh;
+  background: #000;
+}
+
+.app-shell.video-viewer .app-main {
+  padding-bottom: 0;
+}
+
+.desk-content {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.boot {
+  height: 100dvh;
+  display: grid;
+  place-items: center;
+  background: #07070a;
+}
+
+.boot-logo {
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  font-size: 2.4rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: #fff;
+  animation: pulse 1.2s ease infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.7;
+    transform: scale(0.98);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (min-width: 1024px) {
+  body {
+    background: #000;
+    overflow: hidden;
+  }
+
+  .app-shell.desk {
+    max-width: none;
+    margin: 0;
+    height: 100dvh;
+    display: flex;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .desk-content {
+    height: 100dvh;
+  }
+
+  .app-shell.desk .app-main {
+    flex: 1;
+    min-height: 0;
+    padding-bottom: 0;
+    overflow: hidden;
+  }
+}
